@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -25,10 +24,6 @@ const (
 	defaultTimeout = 1 * time.Second
 )
 
-var (
-	defaultSourceSSHKey = filepath.Join(mcnutils.GetHomeDir(), ".ssh", "id_rsa")
-)
-
 // GetCreateFlags registers the flags this driver adds to
 // "docker hosts create"
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
@@ -46,8 +41,8 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		},
 		mcnflag.StringFlag{
 			Name:   "generic-ssh-key",
-			Usage:  "SSH private key path",
-			Value:  defaultSourceSSHKey,
+			Usage:  "SSH private key path (if not provided, identities in ssh-agent will be used)",
+			Value:  "",
 			EnvVar: "GENERIC_SSH_KEY",
 		},
 		mcnflag.IntFlag{
@@ -66,7 +61,6 @@ func NewDriver(hostName, storePath string) drivers.Driver {
 			MachineName: hostName,
 			StorePath:   storePath,
 		},
-		SSHKey: defaultSourceSSHKey,
 	}
 }
 
@@ -93,10 +87,6 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		return errors.New("generic driver requires the --generic-ip-address option")
 	}
 
-	if d.SSHKey == "" {
-		return errors.New("generic driver requires the --generic-ssh-key option")
-	}
-
 	return nil
 }
 
@@ -109,7 +99,9 @@ func (d *Driver) PreCreateCheck() error {
 }
 
 func (d *Driver) Create() error {
-	log.Info("Importing SSH key...")
+	if d.SSHKey != "" {
+		log.Info("Importing SSH key...")
+	}
 
 	// TODO: validate the key is a valid key
 	if err := mcnutils.CopyFile(d.SSHKey, d.GetSSHKeyPath()); err != nil {
